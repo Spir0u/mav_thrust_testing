@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="standalone"                default="true" />
+  <!-- setting sampling rate to 0.0 means that the sampling rate is derived from the FT filter configuration of the device -->
+  <arg name="time_step"                 default="0.01"/> 
+  <arg name="num_spinners"              default="2" />
+
+  <node name="rokubimini" pkg="bota_device_driver" type="bota_device_driver_node" output="screen" required="true">
+    <param name="standalone"                                type="bool"     value="$(arg standalone)"/>
+    <param name="num_spinners"                              type="int"      value="$(arg num_spinners)"/>
+    <param name="time_step"                                 type="double"   value="$(arg time_step)"/>
+    
+    <param name="ft_sensor0/setup/name"                        type="string"   value="ft_sensor0"/>
+    <param name="ft_sensor0/setup/product_code"                        type="int"   value="1"/>
+    <rosparam ns="ft_sensor0" command="load" file="$(find bota_device_driver)/config/rokubimini_sensor.yaml" />
+    <param name="ft_sensor0/setup/port"                        type="string"   value="/dev/ttyUSB0"/>
+    <param name="ft_sensor0/setup/baud_rate"                        type="int"   value="460800"/>
+
+    <param name="ft_sensor1/setup/name"                        type="string"   value="ft_sensor1"/>
+    <param name="ft_sensor1/setup/product_code"                        type="int"   value="1"/>
+    <rosparam ns="ft_sensor1" command="load" file="$(find bota_device_driver)/config/rokubimini_sensor.yaml" />
+    <param name="ft_sensor1/setup/port"                        type="string"   value="/dev/ttyUSB1"/>
+    <param name="ft_sensor1/setup/baud_rate"                        type="int"   value="460800"/>
+
+  </node>
+
+
+  <node pkg="thrust_test_controller" name="thrust_test_controller_node" type="thrust_test_controller_node.py" output="screen" />
+
+</launch>
