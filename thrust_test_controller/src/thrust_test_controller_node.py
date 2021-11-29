@@ -14,8 +14,10 @@ import numpy as np
 from dynamic_reconfigure.server import Server
 from thrust_test_controller.cfg import thrust_testConfig
 
-from mavros_msgs.msg import TiltrotorActuatorCommands as cmd_msg
-from geometry_msgs.msg import WrenchStamped as wrench_msg
+from  omav_hovery_msgs.msg import UAVStatus as cmd_msg
+from omav_hovery_msgs.msg import MotorStatus
+#from mavros_msgs.msg import TiltrotorActuatorCommands as cmd_msg
+#from geometry_msgs.msg import WrenchStamped as wrench_msg
 
 def rampFromTo(start,end,t,t_total):
     return start + t/t_total * (end-start)
@@ -40,6 +42,8 @@ class ControllerNode():
         rospy.loginfo('topic = %s', topic)
         self.rate = 100.0
         msg = cmd_msg()
+        msg.motors.append(MotorStatus())
+        msg.motors.append(MotorStatus())
         pub = rospy.Publisher(topic, cmd_msg, queue_size=10)
         # rospy.Subscriber("/rokubimini/ft_sensor0/ft_sensor_readings/wrench",
         #                  wrench_msg, self.rokubiCallback0)
@@ -55,11 +59,11 @@ class ControllerNode():
             # print(self.torque0)
             # self.updatePIControl()
             if self.control_mode == 0:
-                msg.u_rotors[0] = self.config.speed_upper
-                msg.u_rotors[1] = self.config.speed_lower
+                msg.motors[0].setpoint = self.config.speed_upper
+                msg.motors[1].setpoint = self.config.speed_lower
             elif self.control_mode == 1:
-                msg.u_rotors[0] = self.config.speed_both
-                msg.u_rotors[1] = self.config.speed_both# + self.config.pi_control * self.pi_correction
+                msg.motors[0].setpoint = self.config.speed_both
+                msg.motors[1].setpoint = self.config.speed_both# + self.config.pi_control * self.pi_correction
             elif self.control_mode == 2:
                 msg = self.updateSmoothRamp()
             elif self.control_mode == 3:
@@ -85,9 +89,11 @@ class ControllerNode():
         return config
 
     def updateSmoothRamp(self):
-        msg = cmd_msg()
-        msg.u_rotors[0] = 0
-        msg.u_rotors[1] = 0
+        msg = cmd_msg(motors[2])
+        msg.motors.append(MotorStatus())
+        msg.motors.append(MotorStatus())
+        msg.motors[0].setpoint = 0
+        msg.motors[1].setpoint = 0
         if self.ramping == True:
             t_since_ramp_start = (
                 rospy.get_rostime() - self.ramp_start_time).to_sec()
@@ -95,12 +101,14 @@ class ControllerNode():
                 speed_ref = t_since_ramp_start/self.config.ramp_time * \
                     (self.config.ramp_vel_end - self.config.ramp_vel_start) + \
                     self.config.ramp_vel_start
-                msg.u_rotors[0] = speed_ref
-                msg.u_rotors[1] = speed_ref# + self.config.pi_control * self.pi_correction
+                msg.motors[0].setpoint = speed_ref
+                msg.motors[1].setpoint = speed_ref# + self.config.pi_control * self.pi_correction
         return msg
 
     def updateStepRamp(self):
-        msg = cmd_msg()
+        msg = cmd_msg(motors[2])
+        msg.motors.append(MotorStatus())
+        msg.motors.append(MotorStatus())
         ref = 0
         if self.ramping == True:
             t_since_ramp_start = (
@@ -127,8 +135,8 @@ class ControllerNode():
                     ref = ref_high
                 elif t_cycle <= 2*t_ramp + t_high:
                     ref = rampFromTo(ref_high,0,t_cycle-t_ramp-t_high,t_ramp)
-        msg.u_rotors[0] = ref
-        msg.u_rotors[1] = ref
+        msg.motors[0].setpoint = ref
+        msg.motors[1].setpoint = ref
         return msg
 
 
