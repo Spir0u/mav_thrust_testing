@@ -62,7 +62,7 @@ class ControllerNode():
                 msg.data = self.config.speed
             elif self.control_mode == 1:
                 msg = self.updateSmoothRamp()
-            elif self.control_mode == 2:
+            elif self.control_mode == 3:
                 msg = self.updateStepRamp()
             # msg.header.stamp = rospy.get_rostime()
             pub.publish(msg)
