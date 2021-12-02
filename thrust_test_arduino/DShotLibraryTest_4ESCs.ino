@@ -1,5 +1,7 @@
 #include "DShot4.h"
 
+#include <ros.h>
+#include <std_msgs/UInt16.h>
 /*
 
   redefine DSHOT_PORT if you want to change the default PORT
@@ -19,6 +21,11 @@
 
 DShot4 esc(DShot4::Mode::DSHOT300);
 
+
+ros::NodeHandle  nh;
+
+ros::Subscriber<std_msgs::UInt16> sub("arduino/esc", esc_cb);
+
 uint16_t throttle = 0;
 uint16_t target = 0;
 
@@ -35,6 +42,10 @@ void setup() {
   esc.setThrottle(M3, throttle, 0);
   esc.attach(M4);
   esc.setThrottle(M4, throttle, 0);
+
+  nh.initNode();
+  nh.subscribe(sub);
+
 }
 
 void loop() {
@@ -81,4 +92,13 @@ void loop() {
   */
 
   delay(2);
+}
+
+
+void esc_cb(const std_msgs::UInt16& cmd_msg){
+  target = cmd_msg.data
+  if(target == 48)
+    digitalWrite(13, HIGH);  //disarmed: led on
+  else  
+    digitalWrite(13, HIGH-digitalRead(13));  //armed: toggle LED
 }

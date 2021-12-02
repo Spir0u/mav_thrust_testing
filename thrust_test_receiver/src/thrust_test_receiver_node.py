@@ -20,8 +20,67 @@ from std_msgs.msg import UInt16 as cmd_msg
 # from mavros_msgs.msg import TiltrotorActuatorCommands as cmd_msg
 # from geometry_msgs.msg import WrenchStamped as wrench_msg
 
+
+class ESCNode():
+    def __init__(self):
+        self.throttle = 0
+        topic = rospy.get_param('~topic', 'arduino/esc')
+        rospy.loginfo('topic = %s', topic)
+        self.rate = 1000.0
+        msg = cmd_msg()
+        pub = rospy.Publisher(topic, cmd_msg, queue_size=10)
+        # rospy.Subscriber("/rokubimini/ft_sensor0/ft_sensor_readings/wrench",
+        #                  wrench_msg, self.rokubiCallback0)
+        # rospy.Subscriber("/rokubimini/ft_sensor1/ft_sensor_readings/wrench",
+        #                  wrench_msg, self.rokubiCallback1)
+        # Wait until sensors ready
+        # while(not(self.ft0Ready and self.ft1Ready)):
+        #     rospy.sleep(1)
+        # Remove constant bias
+        # self.removeBias()
+
+        while not rospy.is_shutdown():
+            current_time = rospy.get_rostime()
+            if((current_time-self.last_command_time).to_sec() > 0.5)
+                self.throttle = 48
+            # print(self.torque0)
+            # self.updatePIControl()
+            if self.control_mode == 0:          # disarmed
+                msg = self.sendDisarm()
+            elif self.control_mode == 1:        # normal
+                msg = self.sendThrottle()
+            elif self.control_mode == 3:        # command
+                msg = self.sendCommand()
+            # msg.header.stamp = rospy.get_rostime()
+            pub.publish(msg)
+            if self.rate:
+                rospy.sleep(1/self.rate)
+            else:
+                rospy.sleep(1.0)
+
+
+    def sendDisarm(self):
+        msg = cmd_msg()
+        msg.data = 48
+        return msg
+
+    def sendThrottle(self):
+        msg = cmd_msg()
+        msg.data = self.throttle
+        return msg
+
+    def sendCommand(self):
+        msg = cmd_msg()
+        msg.data = 48
+        return msg
+
+
 def callback(msg):
     rospy.loginfo(rospy.get_caller_id() + ' I heard %s', msg.data)
+    self.throttle = msg.data
+    self.last_command_time = rospy.get_rostime()
+    self.control_mode = 1;  # edit later
+
 
 def listener():
 
@@ -30,7 +89,7 @@ def listener():
     # anonymous=True flag means that rospy will choose a unique
     # name for our 'listener' node so that multiple listeners can
     # run simultaneously.
-    rospy.init_node('udoo_listener', anonymous=True)
+    # rospy.init_node('udoo_listener', anonymous=True)
 
     rospy.Subscriber('mavros/setpoint_raw/actuator_command', cmd_msg, callback)
 
@@ -38,4 +97,9 @@ def listener():
     rospy.spin()
 
 if __name__ == '__main__':
+    rospy.init_node("udoo_node", anonymous=False)
+    try:
+        cn = ESCNode()
+    except rospy.ROSInterruptException:
+        pass
     listener()
