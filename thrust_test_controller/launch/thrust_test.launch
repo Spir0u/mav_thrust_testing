@@ -4,8 +4,10 @@
   <!-- setting sampling rate to 0.0 means that the sampling rate is derived from the FT filter configuration of the device -->
   <arg name="time_step"                 default="0.01"/> 
   <arg name="num_spinners"              default="2" />
+  <arg name="gcs_name"                  default="flybook3" />
 
-  <node name="rokubimini" pkg="bota_device_driver" type="bota_device_driver_node" output="screen" required="true">
+
+ <!--  <node name="rokubimini" pkg="bota_device_driver" type="bota_device_driver_node" output="screen" required="true">
     <param name="standalone"                                type="bool"     value="$(arg standalone)"/>
     <param name="num_spinners"                              type="int"      value="$(arg num_spinners)"/>
     <param name="time_step"                                 type="double"   value="$(arg time_step)"/>
@@ -21,10 +23,31 @@
     <rosparam ns="ft_sensor1" command="load" file="$(find bota_device_driver)/config/rokubimini_sensor.yaml" />
     <param name="ft_sensor1/setup/port"                        type="string"   value="/dev/ttyUSB1"/>
     <param name="ft_sensor1/setup/baud_rate"                        type="int"   value="460800"/>
+  </node> -->
 
+  <include file="$(find bota_device_driver)/launch/rokubimini.launch"/>
+
+  <node pkg="thrust_test_controller" name="thrust_test_controller_node" type="thrust_test_controller_node.py" output="screen" >
+    <remap from="mavros/cmd" to="mavros/setpoint_raw/tiltrotor_actuator_commands"/>
   </node>
 
+  <node pkg="mavros" type="mavros_node" name="mavros" required="true" clear_params="true" output="screen">
+    <param name="gcs_url" value="udp://@$(arg gcs_name)" />
+    <param name="target_system_id" value="1"/>
+    <param name="target_component_id" value="1"/>
+    <param name="component_id" value="1"/>
+    <param name="fcu_protocol" value="v2.0" />
+    <param name="capability_group" value="Core" />
 
-  <node pkg="thrust_test_controller" name="thrust_test_controller_node" type="thrust_test_controller_node.py" output="screen" />
+    <!-- <remap from="~mocap/tf" to="$(arg odometry_topic_msf)/transform"/> -->
+    <remap from="~setpoint_raw/wrench" to="wrench_target"/>
+    <remap from="~setpoint_raw/attitude" to="attitude_target"/>
+    <remap from="~setpoint_raw/local" to="position_target"/>
+    <remap from="~setpoint_raw/attitude_thrust" to="attitude_thrust_target"/>
+    <remap from="~setpoint_raw/tilt_angle_sp" to="tilt_angle_target"/>
+
+    <rosparam command="load" file="$(find mavros)/launch/px4_pluginlists.yaml"/>
+    <!-- <rosparam command="load" file="$(find mav_startup)/parameters/mavs/$(arg mav_name)/px4_config_$(arg state_estimation).yaml" /> -->
+  </node>
 
 </launch>
