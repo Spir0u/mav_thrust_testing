@@ -4,12 +4,16 @@
   <!-- setting sampling rate to 0.0 means that the sampling rate is derived from the FT filter configuration of the device -->
   <arg name="time_step"                 default="0.01"/> 
 
-<!--   <node pkg="thrust_test_controller" name="thrust_test_controller_node" type="thrust_test_controller_node.py" output="screen" >
-    <remap from="mavros/cmd" to="mavros/setpoint_raw/tiltrotor_actuator_commands"/>
-  </node> -->
-
   <node pkg="thrust_test_receiver" name="thrust_test_receiver_node" type="thrust_test_receiver_node.py" output="screen" >
     <remap from="mavros/cmd" to="mavros/setpoint_raw/actuator_command"/>
+    <param name="port" value="/dev/ttyUSB0"/>
+    <!-- <param name="port" value="/dev/ttyS0"/> -->
+    <param name="baud" value="115200"/>
+    <param name="motor_poles" value="17"/>
   </node>
+
+<!--   <node pkg="thrust_test_receiver" name="esc-tlm" type="thrust_test_receiver_node.py" output="screen" >
+    
+  </node> -->
 
 </launch>

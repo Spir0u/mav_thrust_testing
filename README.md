@@ -1,5 +1,7 @@
 ## Configuration
 
+Source: https://wiki.ros.org/ROS/Tutorials/MultipleMachines
+
 The controller is on the laptop, the listener is the UDOO board.
 To get the IP-address `hostname -I` returns IPv4 IPv6
 
@@ -21,9 +23,9 @@ If you dont't define ROS_IP, then rostopic info will show indeed the proper conn
 ssh hal
 roscore
 
-# Start the listener
+# Start the talker
 
-Now we'll start a listener on hal, configuring ROS_MASTER_URI so that we use the master that was just started:
+Now we'll start a talker on hal, configuring ROS_MASTER_URI so that we use the master that was just started:
 
 ssh hal
 export ROS_MASTER_URI=http://hal:11311
@@ -31,10 +33,17 @@ roslaunch thrust_test_controller thrust_test.launch
 
 rqt
 
-# Start the talker
+rqt_graph
 
-Next we'll start a talker on udoo, also configuring ROS_MASTER_URI so that the master on hal is used:
+rostopic list
+
+rostopic echo /topic_name
+
+# Start the listener
+
+Next we'll start a listener on udoo, also configuring ROS_MASTER_URI so that the master on hal is used:
 
 ssh udoo
 export ROS_MASTER_URI=http://hal:11311
-rosrun rospy_tutorials talker.py
+roslaunch thrust_test_receiver thrust_test.launch
+<!-- rosrun rospy_tutorials talker.py -->

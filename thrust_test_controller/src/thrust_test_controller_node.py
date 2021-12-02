@@ -55,6 +55,8 @@ class ControllerNode():
         # Remove constant bias
         # self.removeBias()
 
+        # rospy.Subscriber("/esc/telemetry", cmd_msg, self.telemetryCallback)
+
         while not rospy.is_shutdown():
             # print(self.torque0)
             # self.updatePIControl()
@@ -175,6 +177,10 @@ class ControllerNode():
     #     self.torque0Bias /= iters
     #     self.torque1Bias /= iters
     #     self.calibrated = True
+
+    # def telemetryCallback(self, data):
+    #     self.tlm_stamp = data.header.stamp
+    #     erpm = data.rpm
 
 
 if __name__ == "__main__":

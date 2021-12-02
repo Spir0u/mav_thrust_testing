@@ -19,8 +19,11 @@
 #define M3 10
 #define M4 11
 
-DShot4 esc(DShot4::Mode::DSHOT300);
 
+void esc_cb(const std_msgs::UInt16& cmd_msg);
+
+
+DShot4 esc(DShot4::Mode::DSHOT300);
 
 ros::NodeHandle  nh;
 
@@ -31,7 +34,6 @@ uint16_t target = 0;
 
 void setup() {
   Serial.begin(115200);   // communicating over usb
-  Serial1.begin(115200);  // communicating over UART1
 
   // Notice, all pins must be connected to same PORT
   esc.attach(M1);
@@ -96,7 +98,7 @@ void loop() {
 
 
 void esc_cb(const std_msgs::UInt16& cmd_msg){
-  target = cmd_msg.data
+  target = cmd_msg.data;
   if(target == 48)
     digitalWrite(13, HIGH);  //disarmed: led on
   else  

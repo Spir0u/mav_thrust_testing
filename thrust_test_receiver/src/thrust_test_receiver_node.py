@@ -10,11 +10,14 @@
 
 import rospy
 import numpy as np
+import serial
+# import asyncio
+# import serial_asyncio
 
 # from dynamic_reconfigure.server import Server
 # from thrust_test_controller.cfg import thrust_testConfig
-
 from std_msgs.msg import UInt16 as cmd_msg
+from mavros_msgs.msg import ESCTelemetryItem as esc_tlm_msg
 # from omav_hovery_msgs.msg import UAVStatus as cmd_msg
 # from omav_hovery_msgs.msg import MotorStatus
 # from mavros_msgs.msg import TiltrotorActuatorCommands as cmd_msg
@@ -24,11 +27,19 @@ from std_msgs.msg import UInt16 as cmd_msg
 class ESCNode():
     def __init__(self):
         self.throttle = 0
+        self.last_command_time = rospy.get_rostime()
+        self.control_mode = 0
         topic = rospy.get_param('~topic', 'arduino/esc')
         rospy.loginfo('topic = %s', topic)
         self.rate = 1000.0
         msg = cmd_msg()
         pub = rospy.Publisher(topic, cmd_msg, queue_size=10)
+
+        tlm_msg = esc_tlm_msg()
+        tlm_pub = rospy.Publisher('arduino/esc/tlm', esc_tlm_msg, queue_size=10)
+
+        rospy.Subscriber('mavros/setpoint_raw/actuator_command', cmd_msg, self.set_esc_callback)
+
         # rospy.Subscriber("/rokubimini/ft_sensor0/ft_sensor_readings/wrench",
         #                  wrench_msg, self.rokubiCallback0)
         # rospy.Subscriber("/rokubimini/ft_sensor1/ft_sensor_readings/wrench",
@@ -39,10 +50,16 @@ class ESCNode():
         # Remove constant bias
         # self.removeBias()
 
+        self.ser = serial.Serial()
+        self.ser.baudrate = rospy.get_param('~baud','9600')
+        self.ser.port = rospy.get_param('~port','/dev/ttyUSB0')
+        self.ser.open()
+        self.ser.reset_input_buffer()
+
         while not rospy.is_shutdown():
             current_time = rospy.get_rostime()
-            if((current_time-self.last_command_time).to_sec() > 0.5)
-                self.throttle = 48
+            if((current_time-self.last_command_time).to_sec() > 0.5):
+                self.throttle = 48      # disable motor
             # print(self.torque0)
             # self.updatePIControl()
             if self.control_mode == 0:          # disarmed
@@ -53,11 +70,16 @@ class ESCNode():
                 msg = self.sendCommand()
             # msg.header.stamp = rospy.get_rostime()
             pub.publish(msg)
+
+            tlm_msg = self.get_tlm(self.ser)
+            if tlm_msg.temperature != 0:
+                tlm_msg.header.stamp = rospy.get_rostime()
+                tlm_pub.publish(tlm_msg)
+
             if self.rate:
                 rospy.sleep(1/self.rate)
             else:
                 rospy.sleep(1.0)
-
 
     def sendDisarm(self):
         msg = cmd_msg()
@@ -74,27 +96,68 @@ class ESCNode():
         msg.data = 48
         return msg
 
+    # def update_crc8(self, crc, crc_seed):
+    #     crc_u = int.from_bytes(crc, sys.byteorder)
+    #     crc_u = (crc_u ^ crc_seed)
+    #     for i in [0,8]:
+    #         if crc_u & 0x80:
+    #             crc_u = 0x7 ^ ( crc_u << 1 )
+    #         else:
+    #             crc_u = crc_u << 1
+    #     return (crc_u);
+        
+    # def get_crc8(self, Buf, BufLen):
+    #     crc = 0
+    #     for i in [0, BufLen]:
+    #         crc = self.update_crc8(bytes(Buf[i]), crc)
+    #     return (crc);
 
-def callback(msg):
-    rospy.loginfo(rospy.get_caller_id() + ' I heard %s', msg.data)
-    self.throttle = msg.data
-    self.last_command_time = rospy.get_rostime()
-    self.control_mode = 1;  # edit later
+    # ESC Telemetry
+        # Byte 0: Temperature 
+        # Byte 1: Voltage high byte
+        # Byte 2: Voltage low byte
+        # Byte 3: Current high byte
+        # Byte 4: Current low byte
+        # Byte 5: Consumption high byte
+        # Byte 6: Consumption low byte
+        # Byte 7: Rpm high byte
+        # Byte 8: Rpm low byte
+        # Byte 9: 8-bit CRC
+
+        # Converting the received values to standard units
+        # int8_t Temperature = Temperature in 1 degree C
+        # uint16_t Voltage = Volt *100 so 1000 are 10.00V
+        # uint16_t Current = Ampere * 100 so 1000 are 10.00A
+        # uint16_t Consumption = Consumption in 1mAh
+        # uint16_t ERpm = Electrical Rpm /100 so 100 are 10000 Erpm
+        # note: to get the real Rpm of the motor you will need to divide the Erpm result by the magnetpole count divided by two.
+        # So with a 14magnetpole motor:
+        # Rpm = Erpm/7
+        # rpm = erpm / (motor poles/2)
+    def get_tlm(self, ser):
+        tlm_msg = esc_tlm_msg()
+        if(ser.in_waiting >= 10):
+            sequence = ser.read(10)
+            tlm =  serial.to_bytes(sequence)
+            if(hash(tlm)==0):
+            # if(self.get_crc8(tlm, 10) == 0):
+                tlm_msg.temperature = tlm[0]                    # degrees C
+                tlm_msg.voltage = (tlm[1] << 8 | tlm[2] )/100   # V
+                tlm_msg.current = (tlm[3] << 8 | tlm[4] )/100   # A
+                tlm_msg.totalcurrent = (tlm[5] << 8 | tlm[6])   # mAh
+                tlm_msg.rpm = (tlm[7] << 8 | tlm[8])            # Erpm
+                #tlm.rpm = tlm.Erpm*200/poles    # rpm
+            else:
+                rospy.loginfo('tlm crc error: %i, %s', hash(tlm), tlm)
+        return tlm_msg 
 
 
-def listener():
+    def set_esc_callback(self, msg):
+        rospy.loginfo(rospy.get_caller_id() + ' Motor speed: %s', msg.data)
+        self.throttle = msg.data
+        self.last_command_time = rospy.get_rostime()
+        self.control_mode = 1;  # edit later
 
-    # In ROS, nodes are uniquely named. If two nodes with the same
-    # name are launched, the previous one is kicked off. The
-    # anonymous=True flag means that rospy will choose a unique
-    # name for our 'listener' node so that multiple listeners can
-    # run simultaneously.
-    # rospy.init_node('udoo_listener', anonymous=True)
-
-    rospy.Subscriber('mavros/setpoint_raw/actuator_command', cmd_msg, callback)
-
-    # spin() simply keeps python from exiting until this node is stopped
-    rospy.spin()
 
 if __name__ == '__main__':
     rospy.init_node("udoo_node", anonymous=False)
@@ -102,4 +165,3 @@ if __name__ == '__main__':
         cn = ESCNode()
     except rospy.ROSInterruptException:
         pass
-    listener()
