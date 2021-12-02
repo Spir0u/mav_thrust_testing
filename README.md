@@ -27,7 +27,9 @@ Now we'll start a listener on hal, configuring ROS_MASTER_URI so that we use the
 
 ssh hal
 export ROS_MASTER_URI=http://hal:11311
-rosrun rospy_tutorials listener.py
+roslaunch thrust_test_controller thrust_test.launch
+
+rqt
 
 # Start the talker
 
