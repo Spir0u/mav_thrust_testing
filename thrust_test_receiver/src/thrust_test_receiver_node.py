@@ -50,11 +50,11 @@ class ESCNode():
         # Remove constant bias
         # self.removeBias()
 
-        self.ser = serial.Serial()
-        self.ser.baudrate = rospy.get_param('~baud','9600')
-        self.ser.port = rospy.get_param('~port','/dev/ttyUSB0')
-        self.ser.open()
-        self.ser.reset_input_buffer()
+        # self.ser = serial.Serial()
+        # self.ser.baudrate = rospy.get_param('~baud','9600')
+        # self.ser.port = rospy.get_param('~port','/dev/ttyUSB0')
+        # self.ser.open()
+        # self.ser.reset_input_buffer()
 
         while not rospy.is_shutdown():
             current_time = rospy.get_rostime()
@@ -71,10 +71,10 @@ class ESCNode():
             # msg.header.stamp = rospy.get_rostime()
             pub.publish(msg)
 
-            tlm_msg = self.get_tlm(self.ser)
-            if tlm_msg.temperature != 0:
-                tlm_msg.header.stamp = rospy.get_rostime()
-                tlm_pub.publish(tlm_msg)
+            # tlm_msg = self.get_tlm(self.ser)
+            # if tlm_msg.temperature != 0:
+            #     tlm_msg.header.stamp = rospy.get_rostime()
+            #     tlm_pub.publish(tlm_msg)
 
             if self.rate:
                 rospy.sleep(1/self.rate)

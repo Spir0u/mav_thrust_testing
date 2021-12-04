@@ -184,7 +184,7 @@ class ControllerNode():
 
 
 if __name__ == "__main__":
-    rospy.init_node("thrust_test_controller_node", anonymous=False)
+    rospy.init_node("thrust_test_controller_node", anonymous=True)
     try:
         cn = ControllerNode()
     except rospy.ROSInterruptException:

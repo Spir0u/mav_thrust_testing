@@ -47,3 +47,20 @@ ssh udoo
 export ROS_MASTER_URI=http://hal:11311
 roslaunch thrust_test_receiver thrust_test.launch
 <!-- rosrun rospy_tutorials talker.py -->
+
+
+# Flybook
+`
+hostname -I
+export ROS_IP=
+roscore
+roslaunch thrust_test_controller thrust_test.launch
+`
+
+# Udoo
+`
+hostname -I
+export ROS_IP=
+export ROS_MASTER_URI=http://ip:11311
+roslaunch thrust_test_receiver thrust_test.launch
+`
