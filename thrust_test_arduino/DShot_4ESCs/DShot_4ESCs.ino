@@ -2,6 +2,7 @@
 
 //#include <ros.h>
 //#include <std_msgs/UInt16.h>
+
 /*
 
   redefine DSHOT_PORT if you want to change the default PORT
@@ -19,29 +20,29 @@
 #define M3 10
 #define M4 11
 
+
 //void esc_cb(const std_msgs::UInt16& cmd_msg);
-
-
-
-DShot4 esc(DShot4::Mode::DSHOT150);
-
 //ros::NodeHandle  nh;
 
+DShot4 esc(DShot4::Mode::DSHOT150);
 
 uint16_t throttle = 0;
 uint16_t target = 0;
 uint16_t target_old = 0;
+uint8_t b1;
+uint8_t b2;
 
-//void esc_cb(const std_msgs::UInt16& cmd_msg){
-//  digitalWrite(13, HIGH);
-//  target = cmd_msg.data;
-//  if(target == 48)
-//    digitalWrite(13, HIGH);  //disarmed: led on
-//  else  
-//    digitalWrite(13, HIGH-digitalRead(13));  //armed: toggle LED
-//}
+/*void esc_cb(const std_msgs::UInt16& cmd_msg){
+ digitalWrite(13, HIGH);
+ target = cmd_msg.data;
+ if(target == 48)
+   digitalWrite(13, HIGH);  //disarmed: led on
+ else  
+   digitalWrite(13, HIGH-digitalRead(13));  //armed: toggle LED
+}
 
-//ros::Subscriber<std_msgs::UInt16> sub("/arduino/esc", esc_cb);
+ros::Subscriber<std_msgs::UInt16> sub("/arduino/esc", esc_cb);
+*/
 
 void setup() {
   Serial.begin(115200);   // communicating over usb
@@ -74,21 +75,39 @@ void setup() {
 void loop() {
   
   if (Serial.available() > 0) {
-    target = Serial.parseInt();
+    b1 = Serial.read();
+    b2 = Serial.read();
+
+    // target = Serial.parseInt();
+    target = b1<<8 + b2;
 
     if (target > 2047)  // safety measure, disarm when wrong input
       target = 0;
-    Serial.print(target, DEC);  //, HEX);
+
+/*    Serial.print(target, DEC);  //, HEX);
     Serial.print("\t");
     Serial.print(throttle, DEC);  //, HEX);
-    Serial.print("\n");
+    Serial.print("\n");*/
+
+    b1 = target >> 8;
+    b2 = target & 0xff;
+
+    Serial.write(b1);     // Send target back
+    Serial.write(b2);
+    b1 = throttle >> 8;
+    b2 = throttle & 0xff;
+    Serial.write(b1);     // Send throttle back
+    Serial.write(b2);
 
     if(target != target_old){
       digitalWrite(LED_BUILTIN, LOW);
       target_old = target;
     }
     
+  }else if(!Serial){  // No serial connection --> Disarm Motors
+    target = 48;
   }
+
   if(throttle == target){
     digitalWrite(LED_BUILTIN, HIGH);
   }
@@ -99,11 +118,13 @@ void loop() {
     if (target <= 48) {
       esc.setThrottle(M1, target, 0);
       if (target == 0 || target == 48) throttle = 48;
-    } else {
+    } 
+    else {
       if (target > throttle) {
         throttle++;
         esc.setThrottle(M1, throttle, 0);
-      } else if (target < throttle) {
+      } 
+      else if (target < throttle) {
         throttle--;
         esc.setThrottle(M1, throttle, 0);
       }

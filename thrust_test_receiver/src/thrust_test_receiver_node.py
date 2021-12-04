@@ -11,7 +11,7 @@
 import rospy
 import numpy as np
 import serial
-import threading
+import struct
 #import asyncio
 # import serial_asyncio
 
@@ -24,17 +24,49 @@ from std_msgs.msg import UInt16 as cmd_msg
 # from mavros_msgs.msg import TiltrotorActuatorCommands as cmd_msg
 # from geometry_msgs.msg import WrenchStamped as wrench_msg
 
-def th_arduino_serial(serial_ard, msg):
-    serial_ard.write(msg)
+class ArduinoSerial():
+    def __init__(self):
+        self.serial = self.initserial()
+
+    def write(self, int_16):
+        self.serial.write(self.to_bytes(int_16))
+
+    def read_int(self):
+        b = self.serial.read(2)
+        return self.to_int(b)
+
+    def initserial(self):
+        ser = serial.Serial(
+            port='/dev/ttyACM0',\
+            baudrate=115200,\
+            parity=serial.PARITY_NONE,\
+            stopbits=serial.STOPBITS_ONE,\
+            bytesize=serial.EIGHTBITS,\
+            timeout=0.1, \
+            xonxoff=False, rtscts=True, write_timeout=0.1, dsrdtr=True, inter_byte_timeout=None, exclusive=True)
+        return ser
+
+    @staticmethod
+    def to_bytes(int_16):
+        b1 = int_16 >> 8
+        b2 = int_16 & 0xff
+        return (b1,b2)
+
+    @staticmethod
+    def to_int(str_bytes):
+        return struct.unpack('>H', str_bytes)[0]
 
 class ESCNode():
     def __init__(self):
         self.throttle = 0
         self.last_command_time = rospy.get_rostime()
-        self.control_mode = 1   # change to 0? (disarmed)
+        self.control_mode = 0   # change to 0? (disarmed)
         topic = rospy.get_param('~topic', 'arduino/esc')
         rospy.loginfo('topic = %s', topic)
-        self.rate = 1000.0
+        self.rate = 5000.0
+        self.serial_rate = 50
+        self.serial_ticks = 0
+        self.new_msg = True
         msg = cmd_msg()
         pub = rospy.Publisher(topic, cmd_msg, queue_size=10)
 
@@ -53,45 +85,42 @@ class ESCNode():
         # Remove constant bias
         # self.removeBias()
 
-        rospy.loginfo(' Initializing both serial')
-        self.ser = serial.Serial()
-        self.ser.baudrate = rospy.get_param('~tlm_baud','9600')
-        self.ser.port = rospy.get_param('~tlm_port','/dev/ttyUSB0')
-        if not self.ser.is_open:
-            self.ser.open()
-        self.ser.reset_input_buffer()
+        # rospy.loginfo(' Initializing both serial')
+        # self.ser = serial.Serial()
+        # self.ser.baudrate = rospy.get_param('~tlm_baud','9600')
+        # self.ser.port = rospy.get_param('~tlm_port','/dev/ttyUSB0')
+        # if not self.ser.is_open:
+        #     self.ser.open()
+        # self.ser.reset_input_buffer()
 
-        self.ard = serial.Serial()
-        self.ard.baudrate = rospy.get_param('~ard_baud','115200')
-        self.ard.port = rospy.get_param('~tlm_port','/dev/ttyUSB1')
-        self.ard.timeout = 1
-        if self.ard.is_open:
-            rospy.loginfo(' Arduino serial already open...')
-            self.ard.close()
-        self.ard.open()
-        self.ard.reset_input_buffer()
-        self.ard.write(serial.to_bytes(b'48'))
+        self.arduino = ArduinoSerial();
 
-        rospy.loginfo(' Initialized both serial')
+        rospy.loginfo('Initialized serial')
 
         while not rospy.is_shutdown():
             current_time = rospy.get_rostime()
             if((current_time-self.last_command_time).to_sec() > 0.5):
-                self.throttle = 48      # disable motor
-            # print(self.torque0)
-            # self.updatePIControl()
-            if self.control_mode == 0:          # disarmed
-                msg = self.sendDisarm()
-            elif self.control_mode == 1:        # normal
-                msg = self.sendThrottle()
-            elif self.control_mode == 3:        # command
-                msg = self.sendCommand()
-            # msg.header.stamp = rospy.get_rostime()
-            pub.publish(msg)
-            rospy.loginfo(' Motor speed: %s', msg.data)
-            self.ard.write(msg.data)
-            # threading.Thread(target=th_arduino_serial, args=(self.ard,msg.data,)).start()
-            print(self.ard.readline())
+                self.control_mode = 0     # disable motor
+                self.new_msg = True
+                rospy.loginfo('Motor disabled since no input signal for 0.5s')
+            if self.serial_ticks >= self.rate/self.serial_rate:
+                self.serial_ticks = 0
+                self.new_msg = True
+
+            if self.new_msg:
+                if self.control_mode == 0:          # disarmed
+                    msg = self.sendDisarm()
+                elif self.control_mode == 1:        # normal
+                    msg = self.sendThrottle()
+                elif self.control_mode == 3:        # command
+                    msg = self.sendCommand()
+                # msg.header.stamp = rospy.get_rostime()
+                pub.publish(msg)
+                self.arduino.write(msg.data)
+                print(self.arduino.read_int())  # target
+                print(self.arduino.read_int())  # throttle
+                rospy.loginfo(' Motor speed: %s', msg.data)
+                self.new_msg = False
 
             # tlm_msg = self.get_tlm(self.ser)
             # if tlm_msg.temperature != 0:
@@ -100,10 +129,12 @@ class ESCNode():
 
             if self.rate:
                 rospy.sleep(1/self.rate)
+                self.serial_ticks += 1
             else:
                 rospy.sleep(1.0)
 
     def sendDisarm(self):
+        self.throttle = 48
         msg = cmd_msg()
         msg.data = 48
         return msg
@@ -175,10 +206,12 @@ class ESCNode():
 
 
     def set_esc_callback(self, msg):
-        # rospy.loginfo(rospy.get_caller_id() + ' Motor speed: %s', msg.data)
-        self.throttle = msg.data
         self.last_command_time = rospy.get_rostime()
         self.control_mode = 1;  # edit later
+        if self.throttle != msg.data:
+            self.throttle = msg.data
+            self.new_msg = True;
+            rospy.loginfo('new throttle:' + str(self.throttle))
 
 
 if __name__ == '__main__':
