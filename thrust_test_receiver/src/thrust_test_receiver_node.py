@@ -11,32 +11,35 @@
 import rospy
 import numpy as np
 import serial
-# import asyncio
+import threading
+#import asyncio
 # import serial_asyncio
 
 # from dynamic_reconfigure.server import Server
 # from thrust_test_controller.cfg import thrust_testConfig
 from std_msgs.msg import UInt16 as cmd_msg
-from mavros_msgs.msg import ESCTelemetryItem as esc_tlm_msg
+# from mavros_msgs.msg import ESCTelemetryItem as esc_tlm_msg
 # from omav_hovery_msgs.msg import UAVStatus as cmd_msg
 # from omav_hovery_msgs.msg import MotorStatus
 # from mavros_msgs.msg import TiltrotorActuatorCommands as cmd_msg
 # from geometry_msgs.msg import WrenchStamped as wrench_msg
 
+def th_arduino_serial(serial_ard, msg):
+    serial_ard.write(msg)
 
 class ESCNode():
     def __init__(self):
         self.throttle = 0
         self.last_command_time = rospy.get_rostime()
-        self.control_mode = 0
+        self.control_mode = 1   # change to 0? (disarmed)
         topic = rospy.get_param('~topic', 'arduino/esc')
         rospy.loginfo('topic = %s', topic)
         self.rate = 1000.0
         msg = cmd_msg()
         pub = rospy.Publisher(topic, cmd_msg, queue_size=10)
 
-        tlm_msg = esc_tlm_msg()
-        tlm_pub = rospy.Publisher('arduino/esc/tlm', esc_tlm_msg, queue_size=10)
+        # tlm_msg = esc_tlm_msg()
+        # tlm_pub = rospy.Publisher('arduino/esc/tlm', esc_tlm_msg, queue_size=10)
 
         rospy.Subscriber('mavros/setpoint_raw/actuator_command', cmd_msg, self.set_esc_callback)
 
@@ -50,11 +53,26 @@ class ESCNode():
         # Remove constant bias
         # self.removeBias()
 
+        rospy.loginfo(' Initializing both serial')
         self.ser = serial.Serial()
-        self.ser.baudrate = rospy.get_param('~baud','9600')
-        self.ser.port = rospy.get_param('~port','/dev/ttyUSB0')
-        self.ser.open()
+        self.ser.baudrate = rospy.get_param('~tlm_baud','9600')
+        self.ser.port = rospy.get_param('~tlm_port','/dev/ttyUSB0')
+        if not self.ser.is_open:
+            self.ser.open()
         self.ser.reset_input_buffer()
+
+        self.ard = serial.Serial()
+        self.ard.baudrate = rospy.get_param('~ard_baud','115200')
+        self.ard.port = rospy.get_param('~tlm_port','/dev/ttyUSB1')
+        self.ard.timeout = 1
+        if self.ard.is_open:
+            rospy.loginfo(' Arduino serial already open...')
+            self.ard.close()
+        self.ard.open()
+        self.ard.reset_input_buffer()
+        self.ard.write(serial.to_bytes(b'48'))
+
+        rospy.loginfo(' Initialized both serial')
 
         while not rospy.is_shutdown():
             current_time = rospy.get_rostime()
@@ -70,11 +88,15 @@ class ESCNode():
                 msg = self.sendCommand()
             # msg.header.stamp = rospy.get_rostime()
             pub.publish(msg)
+            rospy.loginfo(' Motor speed: %s', msg.data)
+            self.ard.write(msg.data)
+            # threading.Thread(target=th_arduino_serial, args=(self.ard,msg.data,)).start()
+            print(self.ard.readline())
 
-            tlm_msg = self.get_tlm(self.ser)
-            if tlm_msg.temperature != 0:
-                tlm_msg.header.stamp = rospy.get_rostime()
-                tlm_pub.publish(tlm_msg)
+            # tlm_msg = self.get_tlm(self.ser)
+            # if tlm_msg.temperature != 0:
+            #     tlm_msg.header.stamp = rospy.get_rostime()
+            #     tlm_pub.publish(tlm_msg)
 
             if self.rate:
                 rospy.sleep(1/self.rate)
@@ -153,15 +175,17 @@ class ESCNode():
 
 
     def set_esc_callback(self, msg):
-        rospy.loginfo(rospy.get_caller_id() + ' Motor speed: %s', msg.data)
+        # rospy.loginfo(rospy.get_caller_id() + ' Motor speed: %s', msg.data)
         self.throttle = msg.data
         self.last_command_time = rospy.get_rostime()
         self.control_mode = 1;  # edit later
 
 
 if __name__ == '__main__':
-    rospy.init_node("udoo_node", anonymous=False)
+    rospy.init_node("udoo_node", anonymous=True)
     try:
         cn = ESCNode()
     except rospy.ROSInterruptException:
         pass
+
+# TODO Close serial

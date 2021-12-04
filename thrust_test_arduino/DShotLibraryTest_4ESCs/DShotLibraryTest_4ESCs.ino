@@ -1,7 +1,7 @@
 #include "DShot4.h"
 
-#include <ros.h>
-#include <std_msgs/UInt16.h>
+//#include <ros.h>
+//#include <std_msgs/UInt16.h>
 /*
 
   redefine DSHOT_PORT if you want to change the default PORT
@@ -19,22 +19,35 @@
 #define M3 10
 #define M4 11
 
+//void esc_cb(const std_msgs::UInt16& cmd_msg);
 
-void esc_cb(const std_msgs::UInt16& cmd_msg);
 
 
-DShot4 esc(DShot4::Mode::DSHOT300);
+DShot4 esc(DShot4::Mode::DSHOT150);
 
-ros::NodeHandle  nh;
+//ros::NodeHandle  nh;
 
-ros::Subscriber<std_msgs::UInt16> sub("arduino/esc", esc_cb);
 
 uint16_t throttle = 0;
 uint16_t target = 0;
+uint16_t target_old = 0;
+
+//void esc_cb(const std_msgs::UInt16& cmd_msg){
+//  digitalWrite(13, HIGH);
+//  target = cmd_msg.data;
+//  if(target == 48)
+//    digitalWrite(13, HIGH);  //disarmed: led on
+//  else  
+//    digitalWrite(13, HIGH-digitalRead(13));  //armed: toggle LED
+//}
+
+//ros::Subscriber<std_msgs::UInt16> sub("/arduino/esc", esc_cb);
 
 void setup() {
   Serial.begin(115200);   // communicating over usb
-
+  pinMode(LED_BUILTIN, OUTPUT);
+  digitalWrite(LED_BUILTIN, HIGH);
+  
   // Notice, all pins must be connected to same PORT
   esc.attach(M1);
   esc.setThrottle(M1, throttle, 0);
@@ -45,12 +58,21 @@ void setup() {
   esc.attach(M4);
   esc.setThrottle(M4, throttle, 0);
 
-  nh.initNode();
-  nh.subscribe(sub);
+//  nh.initNode();
+//  nh.subscribe(sub);
 
+  digitalWrite(LED_BUILTIN, LOW);
+  digitalWrite(LED_BUILTIN, HIGH);
+  delay(1000);
+  digitalWrite(LED_BUILTIN, LOW);
+  delay(200);
+  digitalWrite(LED_BUILTIN, HIGH);
+  delay(500);
+  digitalWrite(LED_BUILTIN, LOW);
 }
 
 void loop() {
+  
   if (Serial.available() > 0) {
     target = Serial.parseInt();
 
@@ -60,21 +82,31 @@ void loop() {
     Serial.print("\t");
     Serial.print(throttle, DEC);  //, HEX);
     Serial.print("\n");
-  }
 
-  if (throttle < 48) {  // special commands disabled
-    throttle = 48;
+    if(target != target_old){
+      digitalWrite(LED_BUILTIN, LOW);
+      target_old = target;
+    }
+    
   }
-  if (target <= 48) {
-    esc.setThrottle(M1, target, 0);
-    if (target == 0) throttle = 48;
-  } else {
-    if (target > throttle) {
-      throttle++;
-      esc.setThrottle(M1, throttle, 0);
-    } else if (target < throttle) {
-      throttle--;
-      esc.setThrottle(M1, throttle, 0);
+  if(throttle == target){
+    digitalWrite(LED_BUILTIN, HIGH);
+  }
+  else {
+    if (throttle < 48) {  // special commands disabled
+    throttle = 48;
+    }
+    if (target <= 48) {
+      esc.setThrottle(M1, target, 0);
+      if (target == 0 || target == 48) throttle = 48;
+    } else {
+      if (target > throttle) {
+        throttle++;
+        esc.setThrottle(M1, throttle, 0);
+      } else if (target < throttle) {
+        throttle--;
+        esc.setThrottle(M1, throttle, 0);
+      }
     }
   }
 
@@ -92,15 +124,6 @@ void loop() {
     tlmData.crcCheck = bufferTlm[9] == calculateCrc8(bufferTlm, TLM_LENGTH-1);
     Serial.write(tlmData);
   */
-
+//  nh.spinOnce();
   delay(2);
-}
-
-
-void esc_cb(const std_msgs::UInt16& cmd_msg){
-  target = cmd_msg.data;
-  if(target == 48)
-    digitalWrite(13, HIGH);  //disarmed: led on
-  else  
-    digitalWrite(13, HIGH-digitalRead(13));  //armed: toggle LED
 }
