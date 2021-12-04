@@ -97,6 +97,19 @@ class ESCNode():
 
         rospy.loginfo('Initialized serial')
 
+        self.ard = serial.Serial()
+        self.ard.baudrate = rospy.get_param('~ard_baud','115200')
+        self.ard.port = rospy.get_param('~tlm_port','/dev/ttyUSB1')
+        self.ard.timeout = 1
+        if self.ard.is_open:
+            rospy.loginfo(' Arduino serial already open...')
+            self.ard.close()
+        self.ard.open()
+        self.ard.reset_input_buffer()
+        self.ard.write(serial.to_bytes(b'48'))
+
+        rospy.loginfo(' Initialized both serial')
+
         while not rospy.is_shutdown():
             current_time = rospy.get_rostime()
             if((current_time-self.last_command_time).to_sec() > 0.5):
