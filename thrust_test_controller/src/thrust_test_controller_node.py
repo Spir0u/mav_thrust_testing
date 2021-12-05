@@ -22,7 +22,7 @@ from geometry_msgs.msg import WrenchStamped as wrench_msg
 
 
 def rampFromTo(start,end,t,t_total):
-    return start + t/t_total * (end-start)
+    return t/t_total * (end-start) + start
 
 class ControllerNode():
     def __init__(self):
@@ -42,7 +42,8 @@ class ControllerNode():
         srv = Server(thrust_testConfig, self.configCallback)
         topic = rospy.get_param('~topic', 'mavros/cmd')
         rospy.loginfo('topic = %s', topic)
-        self.rate = 100.0
+        self.rate = rospy.Rate((rospy.get_param('~rate', 100)))
+
         msg = cmd_msg()
         pub = rospy.Publisher(topic, cmd_msg, queue_size=10)
         # rospy.Subscriber("/rokubimini/ft_sensor0/ft_sensor_readings/wrench",
@@ -64,16 +65,18 @@ class ControllerNode():
                 msg.data = self.config.speed
             elif self.control_mode == 1:
                 msg = self.updateSmoothRamp()
-            elif self.control_mode == 3:
+            elif self.control_mode == 2:
                 msg = self.updateStepRamp()
             # msg.header.stamp = rospy.get_rostime()
             pub.publish(msg)
-            if self.rate:
-                rospy.sleep(1/self.rate)
-            else:
-                rospy.sleep(1.0)
+
+            self.rate.sleep()
 
     def configCallback(self, config, level):
+        if config.stop_motor == True:
+            config.control_mode = 0
+            config.speed = 48
+            config.start_ramp = False
         if self.ramping == False and (config.control_mode == 1 or config.control_mode == 2) and config.start_ramp == True:
             self.ramping = True
             self.ramp_start_time = rospy.get_rostime()
@@ -88,26 +91,31 @@ class ControllerNode():
 
     def updateSmoothRamp(self):
         msg = cmd_msg()
-        msg.data = 0
+        msg.data = 48
         if self.ramping == True:
-            t_since_ramp_start = (
-                rospy.get_rostime() - self.ramp_start_time).to_sec()
+            t_since_ramp_start = (rospy.get_rostime() - self.ramp_start_time).to_sec()
             if t_since_ramp_start <= self.config.ramp_time:
-                speed_ref = t_since_ramp_start/self.config.ramp_time * \
-                    (self.config.ramp_vel_end - self.config.ramp_vel_start) + \
-                    self.config.ramp_vel_start
-                msg.data = speed_ref
+                speed_ref = rampFromTo(self.config.ramp_vel_start, self.config.ramp_vel_end, t_since_ramp_start, self.config.ramp_time)
+                msg.data = int(speed_ref)
                 # msg.u_rotors[1] = speed_ref# + self.config.pi_control * self.pi_correction
+            elif t_since_ramp_start <= self.config.ramp_time + self.config.high_time:
+                msg.data = self.config.ramp_vel_end
+            else:
+                self.config.start_ramp = False
+                # self.ramping = False
+                # params = { 'ramping' : 'False', 'my_int_parameter' : 5 }
+                # config = client.update_configuration(params)
         return msg
 
     def updateStepRamp(self):
         msg = cmd_msg()
-        ref = 0
+        ref = 48
         if self.ramping == True:
-            t_since_ramp_start = (
-                rospy.get_rostime() - self.ramp_start_time).to_sec()
+            t_since_ramp_start = (rospy.get_rostime() - self.ramp_start_time).to_sec()
             # Find current phase of ramp:
             config = self.config
+            min_speed = config.min_speed
+            max_speed = config.max_speed
             t_ramp = config.ramp_time_steps
             t_high = config.high_time
             t_idle = config.idle_time
@@ -121,14 +129,14 @@ class ControllerNode():
                 config.start_ramp = False
             else:
                 t_cycle = t_since_ramp_start - n_cycle * cycle_time
-                ref_high = config.min_speed + n_cycle * (config.max_speed - config.min_speed) / (config.n_steps-1)
+                ref_high = min_speed + (n_cycle+1) * (max_speed - min_speed) / (config.n_steps)
                 if t_cycle <= t_ramp:
-                    ref = rampFromTo(0,ref_high,t_cycle,t_ramp)
+                    ref = rampFromTo(min_speed,ref_high,t_cycle,t_ramp)
                 elif t_cycle <= t_ramp + t_high:
                     ref = ref_high
                 elif t_cycle <= 2*t_ramp + t_high:
-                    ref = rampFromTo(ref_high,0,t_cycle-t_ramp-t_high,t_ramp)
-        msg.data = ref
+                    ref = rampFromTo(ref_high,min_speed,t_cycle-t_ramp-t_high,t_ramp)
+        msg.data = int(ref)
         # msg.u_rotors[1] = ref
         return msg
 

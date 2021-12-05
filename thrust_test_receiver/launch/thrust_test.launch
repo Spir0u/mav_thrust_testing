@@ -2,7 +2,7 @@
 <launch>
   <arg name="standalone"                default="true" />
   <!-- setting sampling rate to 0.0 means that the sampling rate is derived from the FT filter configuration of the device -->
-  <arg name="time_step"                 default="0.01"/> 
+  <arg name="rate"                 default="100"/> 
 
   <node pkg="thrust_test_receiver" name="thrust_test_receiver_node" type="thrust_test_receiver_node.py" output="screen" >
     <remap from="mavros/cmd" to="mavros/setpoint_raw/actuator_command"/>
