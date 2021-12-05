@@ -29,11 +29,15 @@ class ArduinoSerial():
         self.serial = self.initserial()
 
     def write(self, int_16):
-        self.serial.write(self.to_bytes(int_16))
+        # self.serial.write(self.to_bytes(int_16))
+        self.serial.write(hex(int_16)[2:] + '\n')       # writes as hex string
 
     def read_int(self):
         b = self.serial.read(2)
         return self.to_int(b)
+
+    def read_str(self):
+        return self.serial.read_until(b'\n')
 
     def initserial(self):
         ser = serial.Serial(
@@ -45,6 +49,9 @@ class ArduinoSerial():
             timeout=0.1, \
             xonxoff=False, rtscts=True, write_timeout=0.1, dsrdtr=True, inter_byte_timeout=None, exclusive=True)
         return ser
+
+    def printstats(self):
+        print(self.serial.in_waiting, self.serial.out_waiting, self.serial.get_settings())
 
     @staticmethod
     def to_bytes(int_16):
@@ -63,8 +70,9 @@ class ESCNode():
         self.control_mode = 0   # change to 0? (disarmed)
         topic = rospy.get_param('~topic', 'arduino/esc')
         rospy.loginfo('topic = %s', topic)
-        self.rate = 5000.0
-        self.serial_rate = 50
+        self.rate_main = rospy.get_param('~rate', 5000.0)
+        self.rate = rospy.Rate(self.rate_main)
+        self.serial_rate = 1000
         self.serial_ticks = 0
         self.new_msg = True
         msg = cmd_msg()
@@ -103,7 +111,7 @@ class ESCNode():
                 self.control_mode = 0     # disable motor
                 self.new_msg = True
                 rospy.loginfo('Motor disabled since no input signal for 0.5s')
-            if self.serial_ticks >= self.rate/self.serial_rate:
+            if self.serial_ticks >= self.rate_main/self.serial_rate:
                 self.serial_ticks = 0
                 self.new_msg = True
 
@@ -117,21 +125,20 @@ class ESCNode():
                 # msg.header.stamp = rospy.get_rostime()
                 pub.publish(msg)
                 self.arduino.write(msg.data)
-                print(self.arduino.read_int())  # target
-                print(self.arduino.read_int())  # throttle
-                rospy.loginfo(' Motor speed: %s', msg.data)
+                # self.arduino.printstats()
+                rospy.loginfo('Motor speed: %s', msg.data)
+                arduino_data = self.arduino.read_str()
+                if(msg.data != int(arduino_data)):
+                    print("warning: Target from Arduino=" + arduino_data\
+                    + ", msg.data = " + str(msg.data))  # target
                 self.new_msg = False
 
             # tlm_msg = self.get_tlm(self.ser)
             # if tlm_msg.temperature != 0:
             #     tlm_msg.header.stamp = rospy.get_rostime()
             #     tlm_pub.publish(tlm_msg)
-
-            if self.rate:
-                rospy.sleep(1/self.rate)
-                self.serial_ticks += 1
-            else:
-                rospy.sleep(1.0)
+            self.serial_ticks += 1
+            self.rate.sleep()
 
     def sendDisarm(self):
         self.throttle = 48
@@ -211,7 +218,7 @@ class ESCNode():
         if self.throttle != msg.data:
             self.throttle = msg.data
             self.new_msg = True;
-            rospy.loginfo('new throttle:' + str(self.throttle))
+            # rospy.loginfo('new throttle:' + str(self.throttle))
 
 
 if __name__ == '__main__':

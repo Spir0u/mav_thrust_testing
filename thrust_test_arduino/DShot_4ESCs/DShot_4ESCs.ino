@@ -20,24 +20,25 @@
 #define M3 10
 #define M4 11
 
-
-//void esc_cb(const std_msgs::UInt16& cmd_msg);
-//ros::NodeHandle  nh;
+// void esc_cb(const std_msgs::UInt16& cmd_msg);
+// ros::NodeHandle  nh;
 
 DShot4 esc(DShot4::Mode::DSHOT150);
 
-uint16_t throttle = 0;
+uint16_t throttle = 48;
 uint16_t target = 0;
 uint16_t target_old = 0;
 uint8_t b1;
 uint8_t b2;
+char input[5];
+uint8_t charsRead;
 
 /*void esc_cb(const std_msgs::UInt16& cmd_msg){
  digitalWrite(13, HIGH);
  target = cmd_msg.data;
  if(target == 48)
    digitalWrite(13, HIGH);  //disarmed: led on
- else  
+ else
    digitalWrite(13, HIGH-digitalRead(13));  //armed: toggle LED
 }
 
@@ -45,10 +46,10 @@ ros::Subscriber<std_msgs::UInt16> sub("/arduino/esc", esc_cb);
 */
 
 void setup() {
-  Serial.begin(115200);   // communicating over usb
+  Serial.begin(115200);  // communicating over usb
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, HIGH);
-  
+
   // Notice, all pins must be connected to same PORT
   esc.attach(M1);
   esc.setThrottle(M1, throttle, 0);
@@ -59,8 +60,8 @@ void setup() {
   esc.attach(M4);
   esc.setThrottle(M4, throttle, 0);
 
-//  nh.initNode();
-//  nh.subscribe(sub);
+  //  nh.initNode();
+  //  nh.subscribe(sub);
 
   digitalWrite(LED_BUILTIN, LOW);
   digitalWrite(LED_BUILTIN, HIGH);
@@ -73,61 +74,51 @@ void setup() {
 }
 
 void loop() {
-  
   if (Serial.available() > 0) {
-    b1 = Serial.read();
-    b2 = Serial.read();
-
-    // target = Serial.parseInt();
-    target = b1<<8 + b2;
+    // b1 = Serial.read();
+    // b2 = Serial.read();
+    // target = b1<<8 + b2;
+    charsRead =
+        Serial.readBytesUntil('\n', input, 4);  // fetch the two characters
+    input[charsRead] = '\0';                    // Make it a string
+    target = (int)strtol(input, 0, 16);         // Convert it
 
     if (target > 2047)  // safety measure, disarm when wrong input
       target = 0;
 
-/*    Serial.print(target, DEC);  //, HEX);
-    Serial.print("\t");
-    Serial.print(throttle, DEC);  //, HEX);
-    Serial.print("\n");*/
+    Serial.print(target, DEC);    //, HEX);
+    Serial.print("\n");
 
-    b1 = target >> 8;
-    b2 = target & 0xff;
+    /*    b1 = target >> 8;
+        b2 = target & 0xff;
 
-    Serial.write(b1);     // Send target back
-    Serial.write(b2);
-    b1 = throttle >> 8;
-    b2 = throttle & 0xff;
-    Serial.write(b1);     // Send throttle back
-    Serial.write(b2);
-
-    if(target != target_old){
+        Serial.write(b1);     // Send target back
+        Serial.write(b2);
+        b1 = throttle >> 8;
+        b2 = throttle & 0xff;
+        Serial.write(b1);     // Send throttle back
+        Serial.write(b2);
+    */
+    if (target != target_old) {
       digitalWrite(LED_BUILTIN, LOW);
       target_old = target;
     }
-    
-  }else if(!Serial){  // No serial connection --> Disarm Motors
+
+  } else if (!Serial) {  // No serial connection --> Disarm Motors
     target = 48;
   }
 
-  if(throttle == target){
+  if (throttle == target) {
     digitalWrite(LED_BUILTIN, HIGH);
-  }
-  else {
+  } else {
     if (throttle < 48) {  // special commands disabled
-    throttle = 48;
+      throttle = 48;
     }
+    esc.setThrottle(M1, target, 0);
     if (target <= 48) {
-      esc.setThrottle(M1, target, 0);
       if (target == 0 || target == 48) throttle = 48;
-    } 
-    else {
-      if (target > throttle) {
-        throttle++;
-        esc.setThrottle(M1, throttle, 0);
-      } 
-      else if (target < throttle) {
-        throttle--;
-        esc.setThrottle(M1, throttle, 0);
-      }
+    } else {
+      throttle = target;
     }
   }
 
@@ -145,6 +136,6 @@ void loop() {
     tlmData.crcCheck = bufferTlm[9] == calculateCrc8(bufferTlm, TLM_LENGTH-1);
     Serial.write(tlmData);
   */
-//  nh.spinOnce();
+  //  nh.spinOnce();
   delay(2);
 }
