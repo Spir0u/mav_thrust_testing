@@ -32,6 +32,7 @@ uint8_t b1;
 uint8_t b2;
 char input[5];
 uint8_t charsRead;
+uint16_t sendTelemetry = 0;
 
 /*void esc_cb(const std_msgs::UInt16& cmd_msg){
  digitalWrite(13, HIGH);
@@ -114,12 +115,20 @@ void loop() {
     if (throttle < 48) {  // special commands disabled
       throttle = 48;
     }
-    esc.setThrottle(M1, target, 0);
     if (target <= 48) {
       if (target == 0 || target == 48) throttle = 48;
     } else {
       throttle = target;
     }
+  }
+
+  if(sendTelemetry >= 50){
+    esc.setThrottle(M1, target, 1);   //  send telemetry data from M1
+    sendTelemetry = 0;
+  }
+  else{
+    esc.setThrottle(M1, target, 0);
+    sendTelemetry++;
   }
 
   /*

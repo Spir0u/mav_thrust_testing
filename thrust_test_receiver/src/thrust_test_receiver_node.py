@@ -12,13 +12,12 @@ import rospy
 import numpy as np
 import serial
 import struct
-#import asyncio
-# import serial_asyncio
+import crc8
 
 # from dynamic_reconfigure.server import Server
 # from thrust_test_controller.cfg import thrust_testConfig
 from std_msgs.msg import UInt16 as cmd_msg
-# from mavros_msgs.msg import ESCTelemetryItem as esc_tlm_msg
+from mavros_msgs.msg import ESCTelemetryItem as esc_tlm_msg
 # from omav_hovery_msgs.msg import UAVStatus as cmd_msg
 # from omav_hovery_msgs.msg import MotorStatus
 # from mavros_msgs.msg import TiltrotorActuatorCommands as cmd_msg
@@ -75,11 +74,14 @@ class ESCNode():
         self.serial_rate = 1000
         self.serial_ticks = 0
         self.new_msg = True
+
+        self.hash = crc8.crc8()
         msg = cmd_msg()
         pub = rospy.Publisher(topic, cmd_msg, queue_size=10)
+        topic = rospy.get_param('~topic', 'arduino/esc/tlm')
 
-        # tlm_msg = esc_tlm_msg()
-        # tlm_pub = rospy.Publisher('arduino/esc/tlm', esc_tlm_msg, queue_size=10)
+        tlm_msg = esc_tlm_msg()
+        tlm_pub = rospy.Publisher('arduino/esc/tlm', esc_tlm_msg, queue_size=10)
 
         rospy.Subscriber('mavros/setpoint_raw/actuator_command', cmd_msg, self.set_esc_callback)
 
@@ -93,13 +95,13 @@ class ESCNode():
         # Remove constant bias
         # self.removeBias()
 
-        # rospy.loginfo(' Initializing both serial')
-        # self.ser = serial.Serial()
-        # self.ser.baudrate = rospy.get_param('~tlm_baud','9600')
-        # self.ser.port = rospy.get_param('~tlm_port','/dev/ttyUSB0')
-        # if not self.ser.is_open:
-        #     self.ser.open()
-        # self.ser.reset_input_buffer()
+        rospy.loginfo(' Initializing both serial')
+        self.ser = serial.Serial()
+        self.ser.baudrate = rospy.get_param('~tlm_baud','115200')
+        self.ser.port = rospy.get_param('~tlm_port','/dev/ttyUSB0')
+        if not self.ser.is_open:
+            self.ser.open()
+        self.ser.reset_input_buffer()
 
         self.arduino = ArduinoSerial();
 
@@ -133,10 +135,11 @@ class ESCNode():
                     + ", msg.data = " + str(msg.data))  # target
                 self.new_msg = False
 
-            # tlm_msg = self.get_tlm(self.ser)
-            # if tlm_msg.temperature != 0:
-            #     tlm_msg.header.stamp = rospy.get_rostime()
-            #     tlm_pub.publish(tlm_msg)
+            tlm_msg = self.get_tlm(self.ser)
+            if tlm_msg.temperature != 0:
+                tlm_msg.header.stamp = rospy.get_rostime()
+                tlm_pub.publish(tlm_msg)
+
             self.serial_ticks += 1
             self.rate.sleep()
 
@@ -195,15 +198,21 @@ class ESCNode():
         # Rpm = Erpm/7
         # rpm = erpm / (motor poles/2)
     def get_tlm(self, ser):
+        # if(ser.in_waiting):
+        #     print(ser.in_waiting, ser.out_waiting, ser.get_settings())
         tlm_msg = esc_tlm_msg()
         if(ser.in_waiting >= 10):
             sequence = ser.read(10)
             tlm =  serial.to_bytes(sequence)
-            if(hash(tlm)==0):
+            self.hash.update(tlm)
+            tlm = struct.unpack('>10B', tlm)
+            # print(tlm)
+
+            if(self.hash.hexdigest()=='00'):
             # if(self.get_crc8(tlm, 10) == 0):
                 tlm_msg.temperature = tlm[0]                    # degrees C
-                tlm_msg.voltage = (tlm[1] << 8 | tlm[2] )/100   # V
-                tlm_msg.current = (tlm[3] << 8 | tlm[4] )/100   # A
+                tlm_msg.voltage = (tlm[1] << 8 | tlm[2] )/100.0   # V
+                tlm_msg.current = (tlm[3] << 8 | tlm[4] )/100.0   # A
                 tlm_msg.totalcurrent = (tlm[5] << 8 | tlm[6])   # mAh
                 tlm_msg.rpm = (tlm[7] << 8 | tlm[8])            # Erpm
                 #tlm.rpm = tlm.Erpm*200/poles    # rpm
