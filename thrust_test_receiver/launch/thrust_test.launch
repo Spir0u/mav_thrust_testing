@@ -6,9 +6,11 @@
 
   <node pkg="thrust_test_receiver" name="thrust_test_receiver_node" type="thrust_test_receiver_node.py" output="screen" >
     <remap from="mavros/cmd" to="mavros/setpoint_raw/actuator_command"/>
-    <param name="port" value="/dev/ttyUSB0"/>
-    <!-- <param name="port" value="/dev/ttyS0"/> -->
-    <param name="baud" value="115200"/>
+    <!-- <param name="port" value="/dev/ttyUSB0"/> -->
+    <param name="tlm_port" value="/dev/ttyS0"/>
+    <param name="tlm_baud" value="115200"/>
+    <param name="arduino_port" value="/dev/ttyACM0"/>
+    <param name="arduino_baud" value="115200"/>
     <param name="motor_poles" value="17"/>
   </node>
 
