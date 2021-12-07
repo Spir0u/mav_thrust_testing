@@ -16,8 +16,8 @@ from thrust_test_controller.cfg import thrust_testConfig
 
 from std_msgs.msg import UInt16 as cmd_msg
 # from omav_hovery_msgs.msg import UAVStatus as cmd_msg
-from omav_hovery_msgs.msg import MotorStatus
-#from mavros_msgs.msg import TiltrotorActuatorCommands as cmd_msg
+# from omav_hovery_msgs.msg import MotorStatus
+# from mavros_msgs.msg import TiltrotorActuatorCommands as cmd_msg
 from geometry_msgs.msg import WrenchStamped as wrench_msg
 
 

@@ -74,8 +74,8 @@ class ESCNode():
         self.serial_rate = 1000
         self.serial_ticks = 0
         self.new_msg = True
+        self.tlm_current = 0
 
-        self.hash = crc8.crc8()
         msg = cmd_msg()
         pub = rospy.Publisher(topic, cmd_msg, queue_size=10)
         topic = rospy.get_param('~topic', 'arduino/esc/tlm')
@@ -107,6 +107,8 @@ class ESCNode():
 
         rospy.loginfo('Initialized serial')
 
+        arduino_current_avg = 0
+
         while not rospy.is_shutdown():
             current_time = rospy.get_rostime()
             if((current_time-self.last_command_time).to_sec() > 0.5):
@@ -130,14 +132,21 @@ class ESCNode():
                 # self.arduino.printstats()
                 rospy.loginfo('Motor speed: %s', msg.data)
                 arduino_data = self.arduino.read_str()
-                if(msg.data != int(arduino_data)):
-                    print("warning: Target from Arduino=" + arduino_data\
-                    + ", msg.data = " + str(msg.data))  # target
+                # if(msg.data != int(arduino_data)):
+                #     print("warning: Target from Arduino=" + arduino_data\
+                #     + ", msg.data = " + str(msg.data))  # target
+                print(arduino_data)
+                arduino_current_avg = (arduino_current_avg*10 +float(arduino_data[:-2]))/11
+                self.tlm_current = (5000/1023*(arduino_current_avg)/15.2) #- 0.5    # 5000mV/((1<<10)-1)*current_read/15.2(mV/A) =[A]
+                                                                                    # - offset
+
+                print(self.tlm_current)
                 self.new_msg = False
 
             tlm_msg = self.get_tlm(self.ser)
             if tlm_msg.temperature != 0:
                 tlm_msg.header.stamp = rospy.get_rostime()
+                tlm_msg.current = self.tlm_current
                 tlm_pub.publish(tlm_msg)
 
             self.serial_ticks += 1
@@ -202,13 +211,14 @@ class ESCNode():
         #     print(ser.in_waiting, ser.out_waiting, ser.get_settings())
         tlm_msg = esc_tlm_msg()
         if(ser.in_waiting >= 10):
+            crc8_hash = crc8.crc8()
             sequence = ser.read(10)
             tlm =  serial.to_bytes(sequence)
-            self.hash.update(tlm)
+            crc8_hash.update(tlm)
             tlm = struct.unpack('>10B', tlm)
             # print(tlm)
 
-            if(self.hash.hexdigest()=='00'):
+            if(crc8_hash.digest()==b'\0'):
             # if(self.get_crc8(tlm, 10) == 0):
                 tlm_msg.temperature = tlm[0]                    # degrees C
                 tlm_msg.voltage = (tlm[1] << 8 | tlm[2] )/100.0   # V
@@ -217,7 +227,7 @@ class ESCNode():
                 tlm_msg.rpm = (tlm[7] << 8 | tlm[8])            # Erpm
                 #tlm.rpm = tlm.Erpm*200/poles    # rpm
             else:
-                rospy.loginfo('tlm crc error: %i, %s', hash(tlm), tlm)
+                rospy.loginfo('tlm crc error: %i, %s', crc8_hash.hexdigest(), tlm)
         return tlm_msg 
 
 

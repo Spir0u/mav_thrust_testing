@@ -23,7 +23,7 @@
 // void esc_cb(const std_msgs::UInt16& cmd_msg);
 // ros::NodeHandle  nh;
 
-DShot4 esc(DShot4::Mode::DSHOT150);
+DShot4 esc(DShot4::Mode::DSHOT600);
 
 uint16_t throttle = 48;
 uint16_t target = 0;
@@ -33,6 +33,8 @@ uint8_t b2;
 char input[5];
 uint8_t charsRead;
 uint16_t sendTelemetry = 0;
+
+int analogPin = A4;
 
 /*void esc_cb(const std_msgs::UInt16& cmd_msg){
  digitalWrite(13, HIGH);
@@ -50,6 +52,7 @@ void setup() {
   Serial.begin(115200);  // communicating over usb
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, HIGH);
+  pinMode(analogPin, INPUT);
 
   // Notice, all pins must be connected to same PORT
   esc.attach(M1);
@@ -87,8 +90,9 @@ void loop() {
     if (target > 2047)  // safety measure, disarm when wrong input
       target = 0;
 
-    Serial.print(target, DEC);    //, HEX);
-    Serial.print("\n");
+    // Serial.print(target, DEC);    //, HEX);
+    // Serial.print("\n");
+    Serial.println(analogRead(analogPin));  // Current : 15.2mv/A
 
     /*    b1 = target >> 8;
         b2 = target & 0xff;
