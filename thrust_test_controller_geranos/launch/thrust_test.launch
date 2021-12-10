@@ -3,11 +3,12 @@
   <arg name="standalone"                default="true" />
   <!-- setting sampling rate to 0.0 means that the sampling rate is derived from the FT filter configuration of the device -->
   <arg name="rate"                      default="100"/> 
+  <arg name="time_step"                      default="0.01"/> 
   <arg name="num_spinners"              default="1" />
   <arg name="gcs_name"                  default="flybook3" />
 
 
- <!--  <node name="rokubimini" pkg="bota_device_driver" type="bota_device_driver_node" output="screen" required="true">
+  <!-- <node name="rokubimini" pkg="bota_device_driver" type="bota_device_driver_node" output="screen" required="true">
     <param name="standalone"                                type="bool"     value="$(arg standalone)"/>
     <param name="num_spinners"                              type="int"      value="$(arg num_spinners)"/>
     <param name="time_step"                                 type="double"   value="$(arg time_step)"/>
@@ -25,12 +26,12 @@
     <param name="ft_sensor1/setup/baud_rate"                        type="int"   value="460800"/>
   </node> -->
 
-  <!-- <include file="$(find bota_device_driver)/launch/rokubimini.launch"/> -->
+  <include file="$(find bota_device_driver)/launch/rokubimini.launch"/>
 
 <!--   <node pkg="thrust_test_controller" name="thrust_test_controller_node" type="thrust_test_controller_node.py" output="screen" >
     <remap from="mavros/cmd" to="mavros/setpoint_raw/tiltrotor_actuator_commands"/>
   </node> -->
-  <node pkg="thrust_test_controller" name="thrust_test_controller_node" type="thrust_test_controller_node.py" output="screen" >
+  <node pkg="thrust_test_controller_geranos" name="thrust_test_controller_node" type="thrust_test_controller_node.py" output="screen" >
     <remap from="mavros/cmd" to="mavros/setpoint_raw/actuator_command"/>
   </node>
 
