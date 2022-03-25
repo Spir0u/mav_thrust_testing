@@ -12,7 +12,7 @@ import rospy
 import numpy as np
 
 from dynamic_reconfigure.server import Server
-from thrust_test_controller.cfg import thrust_testConfig
+from thrust_test_controller_geranos.cfg import thrust_testConfig
 
 from std_msgs.msg import UInt16 as cmd_msg
 # from omav_hovery_msgs.msg import UAVStatus as cmd_msg
@@ -27,18 +27,18 @@ def rampFromTo(start,end,t,t_total):
 class ControllerNode():
     def __init__(self):
         self.ramping = False
-        # self.ft0Ready = False
+        self.ft0Ready = False
         # self.ft1Ready = False
         self.control_mode = 0
         # self.t_err_int = 0
-        # self.torque0 = np.zeros(3)
+        self.torque0 = np.zeros(3)
         # self.torque1 = np.zeros(3)
-        # self.torque0Bias = np.zeros(3)
+        self.torque0Bias = np.zeros(3)
         # self.torque1Bias = np.zeros(3)
-        # self.calibrated = False
-        # self.torque0_stamp = rospy.get_rostime()
+        self.calibrated = False
+        self.torque0_stamp = rospy.get_rostime()
         # self.torque1_stamp = rospy.get_rostime()
-        # self.ft_meas_t_avg_last = rospy.get_rostime().to_sec()
+        self.ft_meas_t_avg_last = rospy.get_rostime().to_sec()
         srv = Server(thrust_testConfig, self.configCallback)
         topic = rospy.get_param('~topic', 'mavros/cmd')
         rospy.loginfo('topic = %s', topic)
@@ -46,15 +46,17 @@ class ControllerNode():
 
         msg = cmd_msg()
         pub = rospy.Publisher(topic, cmd_msg, queue_size=10)
-        # rospy.Subscriber("/rokubimini/ft_sensor0/ft_sensor_readings/wrench",
-        #                  wrench_msg, self.rokubiCallback0)
+        rospy.Subscriber("/rokubimini/ft_sensor0/ft_sensor_readings/wrench",
+                         wrench_msg, self.rokubiCallback0)
         # rospy.Subscriber("/rokubimini/ft_sensor1/ft_sensor_readings/wrench",
         #                  wrench_msg, self.rokubiCallback1)
+        print('test')
+
         # Wait until sensors ready
-        # while(not(self.ft0Ready and self.ft1Ready)):
-        #     rospy.sleep(1)
+        while(not(self.ft0Ready)): # and self.ft1Ready)):
+            rospy.sleep(1)
         # Remove constant bias
-        # self.removeBias()
+        self.removeBias()
 
         # rospy.Subscriber("/esc/telemetry", cmd_msg, self.telemetryCallback)
 
@@ -141,13 +143,13 @@ class ControllerNode():
         return msg
 
 
-    # def rokubiCallback0(self, data):
-    #     self.ft0Ready = True
-    #     self.torque0_stamp = data.header.stamp
-    #     self.torque0 = np.array(
-    #         [data.wrench.torque.x, data.wrench.torque.y, data.wrench.torque.z])
-    #     if (self.calibrated):
-    #         self.torque0 -= self.torque0Bias
+    def rokubiCallback0(self, data):
+        self.ft0Ready = True
+        self.torque0_stamp = data.header.stamp
+        self.torque0 = np.array(
+            [data.wrench.torque.x, data.wrench.torque.y, data.wrench.torque.z])
+        if (self.calibrated):
+            self.torque0 -= self.torque0Bias
 
     # def rokubiCallback1(self, data):
     #     self.ft1Ready = True
@@ -174,17 +176,18 @@ class ControllerNode():
     #     self.pi_correction = self.config.pi_kp * \
     #         torque_err + self.config.pi_ki * self.t_err_int
 
-    # def removeBias(self):
-    #     iters = 0
-    #     for i in range(1, 300):
-    #         self.torque0Bias += self.torque0
-    #         self.torque1Bias += self.torque1
-    #         iters += 1
-    #         rospy.sleep(1/self.rate)
+    def removeBias(self):
+        iters = 0
+        for i in range(1, 300):
+            self.torque0Bias += self.torque0
+            # self.torque1Bias += self.torque1
+            iters += 1
+            # rospy.sleep(1./self.rate)
+            self.rate.sleep()
 
-    #     self.torque0Bias /= iters
-    #     self.torque1Bias /= iters
-    #     self.calibrated = True
+        self.torque0Bias /= iters
+        # self.torque1Bias /= iters
+        self.calibrated = True
 
     # def telemetryCallback(self, data):
     #     self.tlm_stamp = data.header.stamp

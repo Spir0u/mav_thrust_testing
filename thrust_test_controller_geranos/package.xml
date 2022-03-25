@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>thrust_test_controller</name>
+  <name>thrust_test_controller_geranos</name>
   <version>0.0.0</version>
   <description>The dynamic_tutorials package</description>
 

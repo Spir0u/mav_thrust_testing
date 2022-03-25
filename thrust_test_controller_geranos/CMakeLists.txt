@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0.2)
-project(thrust_test_controller)
+project(thrust_test_controller_geranos)
 
 find_package(catkin REQUIRED COMPONENTS
   dynamic_reconfigure
