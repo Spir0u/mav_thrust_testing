@@ -53,6 +53,7 @@ void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, HIGH);
   pinMode(analogPin, INPUT);
+  analogReference(INTERNAL);  // INTERNAL: 2.5V (DEFAULT = 5V)
 
   // Notice, all pins must be connected to same PORT
   esc.attach(M1);
@@ -92,7 +93,11 @@ void loop() {
 
     // Serial.print(target, DEC);    //, HEX);
     // Serial.print("\n");
-    Serial.println(analogRead(analogPin));  // Current : 15.2mv/A
+
+    // Current : 15.2mv/A
+    // analogRead: range 0-1023 for 0V to 2.53V 
+    Serial.println(analogRead(analogPin));  // returns steps
+    // Serial.println(1.075268817*analogRead(analogPin));  // returns mV to pc
 
     /*    b1 = target >> 8;
         b2 = target & 0xff;
@@ -114,26 +119,29 @@ void loop() {
   }
 
   if (throttle == target) {
-    digitalWrite(LED_BUILTIN, HIGH);
+    // digitalWrite(LED_BUILTIN, HIGH);
   } else {
-    if (throttle < 48) {  // special commands disabled
+    if (throttle <= 48) {  // special commands disabled
       throttle = 48;
-    }
-    if (target <= 48) {
-      if (target == 0 || target == 48) throttle = 48;
     } else {
       throttle = target;
     }
   }
 
-  if(sendTelemetry >= 50){
+  /*if(sendTelemetry >= 2){
     esc.setThrottle(M1, target, 1);   //  send telemetry data from M1
     sendTelemetry = 0;
+    // digitalWrite(LED_BUILTIN, HIGH);
+    // delay(20);
+    // esc.setThrottle(M1, target, 0);   //  send no telemetry data from M1
+    // digitalWrite(LED_BUILTIN, LOW);
   }
   else{
     esc.setThrottle(M1, target, 0);
     sendTelemetry++;
-  }
+  }*/
+  esc.setThrottle(M1, target, 1);   //  send telemetry data from M1
+
 
   /*
     static uint8_t bufferTlm[TLM_LENGTH];
@@ -150,5 +158,5 @@ void loop() {
     Serial.write(tlmData);
   */
   //  nh.spinOnce();
-  delay(2);
+  // delay(2);
 }

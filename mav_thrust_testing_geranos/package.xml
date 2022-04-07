@@ -1,0 +1,14 @@
+<package format="2">
+  <name>mav_thrust_testing_geranos</name>
+  <version>0.0.1</version>
+  <description>
+	Direct controller software
+  </description>
+  <maintainer email="kagabrie@ethz.ch">Gabriel Käppeli</maintainer>
+  <license>BSD</license>
+  <buildtool_depend>catkin</buildtool_depend>
+  <buildtool_depend>catkin_simple</buildtool_depend>
+  <depend>glog_catkin</depend>
+  <depend>thrust_test_controller_geranos</depend>
+  <depend>thrust_test_receiver</depend>
+</package>

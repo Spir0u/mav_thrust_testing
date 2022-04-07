@@ -26,7 +26,7 @@
     <param name="ft_sensor1/setup/baud_rate"                        type="int"   value="460800"/>
   </node> -->
 
-  <include file="$(find bota_device_driver)/launch/rokubimini.launch"/>
+  <!-- <include file="$(find bota_device_driver)/launch/rokubimini.launch"/> -->
 
 <!--   <node pkg="thrust_test_controller" name="thrust_test_controller_node" type="thrust_test_controller_node.py" output="screen" >
     <remap from="mavros/cmd" to="mavros/setpoint_raw/tiltrotor_actuator_commands"/>

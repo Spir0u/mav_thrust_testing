@@ -2,6 +2,19 @@
 This code uses the Thrust Test Stand from ASL with the rokubi_mini torque and force sensors.
 The configuration is sent over the network to the Udoo board, which sends the data over serial (as hex ascii) to the built-in Arduino. The Arduino sends the throttle commands over the D-Shot protocol to the ESC. The ESC sends back telemetry data over UART to the Udoo board (ESC temperature, voltage, Erpm) periodically.
 
+## Electrical Setup
+### Top row:
+| Udoo Pin Arduino | Function |
+|------------------|----------|
+| 30               | ESC GND  |
+| 18               | ESC M1   |
+| 1                | ESC CURR |
+### Bottom Row
+| Udoo Pin Embedded | Function |
+|-------------------|----------|
+| 31                | ESC GND  |
+| 33                | ESC TELE |
+
 ## Configuration
 
 Source: https://wiki.ros.org/ROS/Tutorials/MultipleMachines

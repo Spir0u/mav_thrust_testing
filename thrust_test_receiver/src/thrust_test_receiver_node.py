@@ -12,7 +12,7 @@ import rospy
 import numpy as np
 import serial
 import struct
-import crc8
+import crc8     # pip install crc8
 
 # from dynamic_reconfigure.server import Server
 # from thrust_test_controller.cfg import thrust_testConfig
@@ -98,10 +98,13 @@ class ESCNode():
         rospy.loginfo(' Initializing both serial')
         self.ser = serial.Serial()
         self.ser.baudrate = rospy.get_param('~tlm_baud','115200')
-        self.ser.port = rospy.get_param('~tlm_port','/dev/ttyUSB0')
+        self.ser.port = rospy.get_param('~tlm_port','/dev/ttyS0') #'/dev/ttyUSB0')
+        self.ser.timeout = 0.1
         if not self.ser.is_open:
             self.ser.open()
         self.ser.reset_input_buffer()
+
+        rospy.loginfo(str(self.ser))
 
         self.arduino = ArduinoSerial();
 
@@ -130,17 +133,19 @@ class ESCNode():
                 pub.publish(msg)
                 self.arduino.write(msg.data)
                 # self.arduino.printstats()
-                rospy.loginfo('Motor speed: %s', msg.data)
-                arduino_data = self.arduino.read_str()
+                # rospy.loginfo('Motor speed: %s', msg.data)
+                # if(self.arduino.serial.in_waiting > 1)
+                arduino_data = self.arduino.read_str() # 0-1023 for 0-2.53V
                 # if(msg.data != int(arduino_data)):
                 #     print("warning: Target from Arduino=" + arduino_data\
                 #     + ", msg.data = " + str(msg.data))  # target
-                print(arduino_data)
-                arduino_current_avg = (arduino_current_avg*10 +float(arduino_data[:-2]))/11
-                self.tlm_current = (5000/1023*(arduino_current_avg)/15.2) #- 0.5    # 5000mV/((1<<10)-1)*current_read/15.2(mV/A) =[A]
-                                                                                    # - offset
+                # print("Arduino data: " + str(arduino_data))
+                arduino_current_avg = (arduino_current_avg*3 +(1023.0/2530*float(arduino_data)))/4 # mV avg.
+                self.tlm_current = ((arduino_current_avg)/15.2) #- 0.5    # 5000mV/((1<<10)-1)*current_read/15.2(mV/A) =[A] # - offset
+                # else 
+                # self.tlm_current = -1
 
-                print(self.tlm_current)
+                # print("Current: " + str(self.tlm_current) + " A")
                 self.new_msg = False
 
             tlm_msg = self.get_tlm(self.ser)
@@ -211,23 +216,26 @@ class ESCNode():
         #     print(ser.in_waiting, ser.out_waiting, ser.get_settings())
         tlm_msg = esc_tlm_msg()
         if(ser.in_waiting >= 10):
-            crc8_hash = crc8.crc8()
             sequence = ser.read(10)
-            tlm =  serial.to_bytes(sequence)
-            crc8_hash.update(tlm)
-            tlm = struct.unpack('>10B', tlm)
-            # print(tlm)
+            # sequence = []
+            if(len(sequence)>0):
+                crc8_hash = crc8.crc8()
+                # sequence = ser.read(10)
+                tlm =  serial.to_bytes(sequence)
+                crc8_hash.update(tlm)
+                tlm = struct.unpack('>10B', tlm)
+                # print(tlm)
 
-            if(crc8_hash.digest()==b'\0'):
-            # if(self.get_crc8(tlm, 10) == 0):
-                tlm_msg.temperature = tlm[0]                    # degrees C
-                tlm_msg.voltage = (tlm[1] << 8 | tlm[2] )/100.0   # V
-                tlm_msg.current = (tlm[3] << 8 | tlm[4] )/100.0   # A
-                tlm_msg.totalcurrent = (tlm[5] << 8 | tlm[6])   # mAh
-                tlm_msg.rpm = (tlm[7] << 8 | tlm[8])            # Erpm
-                #tlm.rpm = tlm.Erpm*200/poles    # rpm
-            else:
-                rospy.loginfo('tlm crc error: %i, %s', crc8_hash.hexdigest(), tlm)
+                if(crc8_hash.digest()==b'\0'):
+                # if(self.get_crc8(tlm, 10) == 0):
+                    tlm_msg.temperature = tlm[0]                    # degrees C
+                    tlm_msg.voltage = (tlm[1] << 8 | tlm[2] )/100.0   # V
+                    tlm_msg.current = (tlm[3] << 8 | tlm[4] )/100.0   # A
+                    tlm_msg.totalcurrent = (tlm[5] << 8 | tlm[6])   # mAh
+                    tlm_msg.rpm = (tlm[7] << 8 | tlm[8])            # Erpm
+                    #tlm.rpm = tlm.Erpm*200/poles    # rpm
+                else:
+                    rospy.loginfo('tlm crc error: %i, %s', crc8_hash.hexdigest(), tlm)
         return tlm_msg 
 
 
