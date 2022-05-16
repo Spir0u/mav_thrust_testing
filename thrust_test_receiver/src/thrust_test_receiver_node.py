@@ -140,7 +140,8 @@ class ESCNode():
                 #     print("warning: Target from Arduino=" + arduino_data\
                 #     + ", msg.data = " + str(msg.data))  # target
                 # print("Arduino data: " + str(arduino_data))
-                arduino_current_avg = (arduino_current_avg*3 +(1023.0/2530*float(arduino_data)))/4 # mV avg.
+                if(len(arduino_data) > 0 ):  
+                    arduino_current_avg = (arduino_current_avg*3 +(1023.0/2530*float(arduino_data[:-2])))/4 # mV avg.
                 self.tlm_current = ((arduino_current_avg)/15.2) #- 0.5    # 5000mV/((1<<10)-1)*current_read/15.2(mV/A) =[A] # - offset
                 # else 
                 # self.tlm_current = -1
